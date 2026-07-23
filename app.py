@@ -7,6 +7,37 @@ import zipfile
 import tempfile
 import easyocr
 
+
+# تعريف الباسورد المطلوب
+PASSWORD = "123"  # تقدر تغييره لأي باسوورد تحبه
+
+# دالة التحقق من كلمة المرور
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == PASSWORD:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # حذف الباسورد من الذاكرة لأمان أكثر
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # عرض خانة إدخال الباسورد لأول مرة
+        st.text_input("الرجاء إدخال كلمة المرور لدخول التطبيق:", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        # لو الباسورد خطأ
+        st.text_input("الرجاء إدخال كلمة المرور لدخول التطبيق:", type="password", on_change=password_entered, key="password")
+        st.error("😕 كلمة المرور غير صحيحة، حاول مرة أخرى.")
+        return False
+    else:
+        # لو الباسورد صحيح، افتح التطبيق
+        return True
+
+# شرط تشغيل باقي التطبيق
+if check_password():
+    # --- [حط هنا كل كود التطبيق بتاعك القديم زي ما هو] ---
+    st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
+    # وباقي الكود...
 # إعداد واجهة الصفحة
 st.set_page_config(page_title="PDF Rename Tool", page_icon="📄", layout="centered")
 

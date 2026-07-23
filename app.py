@@ -35,12 +35,12 @@ def check_password():
 
 # تفعيل التحقق قبل فتح التطبيق
 if check_password():
-    # الترحيب المخصص باسمك
-    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم / حسن إبراهيم</h3>", unsafe_allow_html=True)
+    # الترحيب المخصص
+    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم المهندس/ حسن إبراهيم</h3>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الواقعة بعد كلمة (Report No) بكل مرونة ودقة.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الواقعة بعد كلمة (Report No) وتصحيح أخطاء الـ OCR تلقائياً.")
 
     @st.cache_resource
     def load_reader():
@@ -76,28 +76,40 @@ if check_password():
                         
                         # منطقة القص العلوية للبحث عن رقم التقرير بدقة
                         rect = fitz.Rect(width * 0.25, height * 0.03, width * 0.99, height * 0.35)
-                        pix = page.get_pixmap(clip=rect, dpi=300)
+                        
+                        # زيادة دقة الصورة لـ 400 وتحويلها لرمادي لتحسين دقة القراءة جداً
+                        pix = page.get_pixmap(clip=rect, dpi=400, colorspace=fitz.csGRAY)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
-                        text = reader.readtext(img_array, detail=0, paragraph=True)
+                        # إجبار القارئ على التعرف على هذه الرموز فقط لتجنب الشوائب
+                        allowlist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ '
+                        text = reader.readtext(img_array, detail=0, paragraph=True, allowlist=allowlist)
                         full_text = " ".join(text).upper()
                         
                         clean_name = ""
                         
-                        # 🟢 تعبير نمطي عام ومرن جداً لالتقاط أي صيغة تأتي بعد كلمة REPORT NO أو ما يشابهها
-                        # يتعامل مع المسافات، الشرطات، النقاط، أو الرموز الفاصلة بطريقة ذكية
+                        # تعبير نمطي مرن يلتقط ما بعد REPORT NO
                         report_match = re.search(r'REP(?:ORT)?[\s\.\-_]*NO[:\s\.\-_]*([A-Z0-9\-_/\.\s]{3,35})', full_text)
                         
                         if report_match:
                             raw_code = report_match.group(1).strip()
-                            # تنظيف النص المستخرج ليكون صالحاً كاسم ملف نظام (إزالة المسافات الزائدة والرموز الممنوعة)
-                            extracted_code = re.sub(r'[\s/\\:\*\?"<>\|]+', '-', raw_code).strip('-')
+                            
+                            # --- فلتر التصحيح الذكي (Smart Correction Filter) ---
+                            # بيعالج اللخبطة البصرية المعتادة في الـ OCR من غير ما يجبره على اسم مشروع ثابت
+                            corrected_code = raw_code.replace('P.', 'P-')
+                            corrected_code = corrected_code.replace('O', '0')
+                            corrected_code = corrected_code.replace('J', '3')
+                            corrected_code = corrected_code.replace('-A-', '-4-')
+                            corrected_code = corrected_code.replace('WAT', 'WQT')
+                            
+                            # تنظيف المسافات والرموز غير المسموحة في أسماء الويندوز
+                            extracted_code = re.sub(r'[\s/\\:\*\?"<>\|]+', '-', corrected_code).strip('-')
+                            
                             if extracted_code:
                                 clean_name = f"{extracted_code}.pdf"
                             else:
                                 clean_name = filename
                         else:
-                            # لو لم يتم العثور على النمط، يحافظ على اسم الملف الأصلي تماماً دون إفساده
                             clean_name = filename
                         
                         doc.close()

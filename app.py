@@ -38,7 +38,7 @@ if check_password():
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بمعالجتها واستخراج أُم الكود الصحيح بدقة متناهية.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بتصحيح الأكواد واستخراج الأسماء المعيارية بدقة كاملة.")
 
     @st.cache_resource
     def load_reader():
@@ -72,8 +72,8 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # توسيع نطاق القراءة قليلاً لضمان عدم قطع أطراف الكود
-                        rect = fitz.Rect(width * 0.30, height * 0.03, width * 0.99, height * 0.32)
+                        # نطاق قراءة دقيق للجزء العلوي من التقرير
+                        rect = fitz.Rect(width * 0.25, height * 0.03, width * 0.99, height * 0.35)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
@@ -82,30 +82,27 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # 🟢 الحل الجذري: البحث عن أي تسلسل يحتوي على P30350 أو يشبهه بداخل النص بغض النظر عن أخطاء الـ OCR
-                        # والبحث عن رقم التقرير النهائي (مثل RT-0036 أو ما يشابهه) لضمان دمج الاسم كاملاً
-                        match_full = re.search(r'(P[-_\s]*303[50SO]+\b.*?RT[-_\s]*\d+)', full_text)
+                        # 1. البحث عن رقم الـ RT الفعلي أياً كان شكله (مثل RT-02261 أو RT-2263 أو ما شابه)
+                        rt_match = re.search(r'RT[-_\s]*(\d+)', full_text)
                         
-                        if match_full:
-                            raw_code = match_full.group(1)
-                            # تنظيف وتصحيح الأخطاء الشائعة للـ OCR تلقائياً
-                            fixed_code = raw_code.replace(" ", "").replace("_", "-")
-                            fixed_code = fixed_code.replace("O", "0").replace("J", "3").replace("S", "5")
-                            # ضمان الصيغة القياسية الصحيحة للمشروع
+                        if rt_match:
+                            rt_number = rt_match.group(1).zfill(5)  # توحيد عدد الأصفار لضمان التنسيق (مثل 02263 أو 02261)
+                            
+                            # تحديد نوع التقرير وتطبيق القاعدة الهندسية الصحيحة 100%
                             if "WQT" in full_text:
-                                clean_name = f"P30350-KTI-WQT-PIP-RT-{re.search(r'RT[-_\s]*(\d+)', fixed_code).group(1)}.pdf"
-                            elif "RDS" in full_text:
-                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{re.search(r'RT[-_\s]*(\d+)', fixed_code).group(1)}.pdf"
+                                clean_name = f"P30350-KTI-WQT-PIP-RT-{rt_number}.pdf"
+                            elif "RDS" in full_text or "P-30" in full_text or "30350" in full_text or "30360" in full_text:
+                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{rt_number}.pdf"
                             else:
-                                clean_name = f"{fixed_code}.pdf"
+                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{rt_number}.pdf"
                         else:
-                            # لو لم يتم مطابقة النمط الكامل، ابحث عن كلمة Report No ورقمها مباشرة
+                            # 2. في حال عدم وجود كلمة RT، نبحث عن أي كود تقرير صريح ونظفه
                             report_no_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
                             if report_no_match:
                                 r_no = report_no_match.group(1).replace("O", "0").replace("J", "3")
                                 clean_name = f"{r_no}.pdf"
                             else:
-                                # لو فشل تماماً، اترك اسم الملف الأصلي كما هو لضمان عدم إتلافه
+                                # الحفاظ على الاسم الأصلي تماماً لو استعصى القارئ
                                 clean_name = filename
                         
                         doc.close()

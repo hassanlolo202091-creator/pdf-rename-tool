@@ -36,7 +36,7 @@ def check_password():
 # تفعيل التحقق قبل فتح التطبيق
 if check_password():
     # الترحيب المخصص باسمك
-    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم / حسن إبراهيم</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم المهندس/ حسن إبراهيم</h3>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
@@ -74,7 +74,7 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # منطقة القص العلوية
+                        # منطقة القص العلوية حيث يوجد رقم التقرير
                         rect = fitz.Rect(width * 0.35, height * 0.05, width * 0.98, height * 0.25)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
@@ -84,14 +84,14 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # 🟢 البحث العمومي عن REPORT NO أو الكود الكامل بغض النظر عن الصيغة
+                        # 🟢 البحث العمومي عن REPORT NO أو أي كود يليها بغض النظر عن الصيغة
                         report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
                         
                         if report_match:
                             extracted_code = report_match.group(1).strip()
                             clean_name = f"{extracted_code}.pdf"
                         else:
-                            # 🟢 خطة بديلة لو كلمة Report No مش واضحة، يبحث عن أي كود يبدأ بـ P ويحتوي على RT
+                            # 🟢 خطة بديلة لو كلمة Report No غير موجودة، يبحث عن أي كود يبدأ بـ P ويحتوي على RT
                             fallback_match = re.search(r'(P[-_A-Z0-9\s\|\+]+?RT[-_\|\s]*\d+)', full_text)
                             if fallback_match:
                                 extracted_code = re.sub(r'[\s\|\+]+', '', fallback_match.group(1))

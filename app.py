@@ -40,7 +40,7 @@ if check_password():
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها، البحث عن رقم التقرير مباشرة، وإعادة تسميته بالاسم الصحيح.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها بدقة واستخراج أرقام التقارير وإعادة تسميتها بالشكل الصحيح.")
 
     @st.cache_resource
     def load_reader():
@@ -74,8 +74,8 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # منطقة القص العلوية حيث يوجد رقم التقرير
-                        rect = fitz.Rect(width * 0.35, height * 0.05, width * 0.98, height * 0.25)
+                        # منطقة القص العلوية للبحث عن رقم التقرير
+                        rect = fitz.Rect(width * 0.30, height * 0.05, width * 0.98, height * 0.30)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
@@ -84,20 +84,21 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # 🟢 البحث العمومي عن REPORT NO أو أي كود يليها بغض النظر عن الصيغة
+                        # 1. البحث الدقيق خلف كلمة REPORT NO
                         report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
                         
                         if report_match:
                             extracted_code = report_match.group(1).strip()
                             clean_name = f"{extracted_code}.pdf"
                         else:
-                            # 🟢 خطة بديلة لو كلمة Report No غير موجودة، يبحث عن أي كود يبدأ بـ P ويحتوي على RT
+                            # 2. بحث بدقيق عن أي نموذج يبدأ بـ P ويحتوي على RT ورقم
                             fallback_match = re.search(r'(P[-_A-Z0-9\s\|\+]+?RT[-_\|\s]*\d+)', full_text)
                             if fallback_match:
                                 extracted_code = re.sub(r'[\s\|\+]+', '', fallback_match.group(1))
                                 clean_name = f"{extracted_code}.pdf"
                             else:
-                                clean_name = f"unnamed_{filename}"
+                                # في حال لم يجد أي نمط، يحافظ على اسم الملف الأصلي تماماً ولا يغيره عشوائياً
+                                clean_name = filename
                         
                         doc.close()
                         

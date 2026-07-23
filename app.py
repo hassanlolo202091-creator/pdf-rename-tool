@@ -36,11 +36,11 @@ def check_password():
 # تفعيل التحقق قبل فتح التطبيق
 if check_password():
     # الترحيب المخصص باسمك
-    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم المهندس/ حسن إبراهيم</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم / حسن إبراهيم</h3>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها بدقة واستخراج أرقام التقارير وإعادة تسميتها بالشكل الصحيح.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الموجودة بعد كلمة (Report No) مباشرة بكل مرونة.")
 
     @st.cache_resource
     def load_reader():
@@ -84,15 +84,15 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # استخراج رقم الـ RT بدقة من النص المرصود
-                        rt_match = re.search(r'RT[-_\s]*(\d+)', full_text)
-                        مباشرة
-                            report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
-                            if report_match:
-                                extracted_code = report_match.group(1).strip().replace("O", "0").replace("J", "3")
-                                clean_name = f"{extracted_code}.pdf"
-                            else:
-                                clean_name = filename  # الحفاظ على الاسم الأصلي تماماً لو لم يجد شيئاً
+                        # بحث عام وشامل عن أي نص يأتي بعد كلمة REPORT NO أياً كانت الصيغة
+                        report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
+                        
+                        if report_match:
+                            extracted_code = report_match.group(1).strip()
+                            clean_name = f"{extracted_code}.pdf"
+                        else:
+                            # لو لم يجد الكلمة، يحافظ على اسم الملف الأصلي تماماً من غير أي تغيير عشوائي
+                            clean_name = filename
                         
                         doc.close()
                         

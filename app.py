@@ -1,12 +1,11 @@
 import streamlit as st
 import fitz  # PyMuPDF
-import numpy as np
 import re
 import os
 import zipfile
 import tempfile
-import easyocr
-import gc  # مكتبة لتفريغ الذاكرة ومنع الكراش
+import pytesseract
+from PIL import Image
 
 # إعداد واجهة الصفحة
 st.set_page_config(page_title="PDF Rename Tool", page_icon="📄", layout="centered")
@@ -40,21 +39,7 @@ if check_password():
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    
-    # تنبيه يظهر لك للتأكد من المكتبات
-    st.info("💡 النظام يعمل الآن بالوضع الآمن لتوفير الذاكرة (RAM) ومنع توقف التطبيق.")
-
-    @st.cache_resource
-    def load_reader():
-        # إيقاف الـ GPU صراحة لتجنب التعارض مع Streamlit Cloud
-        return easyocr.Reader(['en'], gpu=False)
-
-    try:
-        with st.spinner("جاري تهيئة محرك القراءة... برجاء الانتظار"):
-            reader = load_reader()
-    except Exception as e:
-        st.error(f"حدث خطأ أثناء تهيئة القارئ: {e}")
-        st.stop()
+    st.info("💡 تم تفعيل المحرك الخفيف (Tesseract) لضمان عدم توقف التطبيق.")
 
     uploaded_files = st.file_uploader("اختر ملفات الـ PDF أو اسحبها هنا", type=["pdf"], accept_multiple_files=True)
 
@@ -78,26 +63,26 @@ if check_password():
                     try:
                         doc = fitz.open(input_path)
                         page = doc[0]
-                        
                         raw_code = ""
                         
-                        # --- المحاولة الأولى: قراءة النص المدمج (سريعة جداً ومستحيل تعمل كراش) ---
+                        # --- المحاولة الأولى: قراءة النص المدمج في الـ PDF ---
                         native_text = page.get_text("text").upper()
                         report_match = re.search(r'REP(?:ORT)?[\s\.\-_]*NO[:\s\.\-_]*([A-Z0-9\-_/\.\s]{3,35})', native_text)
                         
                         if report_match:
                             raw_code = report_match.group(1).strip()
                         else:
-                            # --- المحاولة الثانية: لو الملف صورة (Scan)، نستخدم OCR بوضع خفيف ---
+                            # --- المحاولة الثانية: استخدام Tesseract OCR للصور ---
                             width, height = page.rect.width, page.rect.height
                             rect = fitz.Rect(width * 0.25, height * 0.03, width * 0.99, height * 0.35)
                             
-                            # دقة 200 ممتازة للـ OCR ولا تستهلك رامات السيرفر
-                            pix = page.get_pixmap(clip=rect, dpi=200, colorspace=fitz.csGRAY)
-                            img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
+                            # التقاط الصورة بدقة 300 ورمادي لضمان أعلى دقة
+                            pix = page.get_pixmap(clip=rect, dpi=300, colorspace=fitz.csGRAY)
+                            img = Image.frombytes("L", [pix.width, pix.height], pix.samples)
                             
-                            text = reader.readtext(img_array, detail=0, paragraph=True)
-                            full_text = " ".join(text).upper()
+                            # إجبار المحرك على التعرف على هذه الرموز فقط لمنع الهلوسة
+                            custom_config = r'-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ --psm 6'
+                            full_text = pytesseract.image_to_string(img, config=custom_config).upper()
                             
                             ocr_match = re.search(r'REP(?:ORT)?[\s\.\-_]*NO[:\s\.\-_]*([A-Z0-9\-_/\.\s]{3,35})', full_text)
                             if ocr_match:
@@ -106,10 +91,10 @@ if check_password():
                         clean_name = filename
                         
                         if raw_code:
-                            # فلتر التصحيح الذكي للأخطاء البصرية الشائعة للـ OCR
+                            # فلتر التصحيح الذكي للأخطاء البصرية الشائعة
                             corrected_code = raw_code.replace('P.', 'P-').replace('O', '0').replace('J', '3').replace('-A-', '-4-').replace('WAT', 'WQT')
                             
-                            # تنظيف الرموز الممنوعة في أسماء الويندوز
+                            # تنظيف الرموز غير المسموحة في أسماء ملفات ويندوز
                             extracted_code = re.sub(r'[\s/\\:\*\?"<>\|]+', '-', corrected_code).strip('-')
                             
                             if extracted_code:
@@ -123,9 +108,6 @@ if check_password():
                         
                     except Exception as e:
                         st.error(f"خطأ في معالجة {filename}: {e}")
-                    
-                    # 🟢 خطوة هامة جداً: تفريغ الرامات بعد كل ملف لمنع الـ Crash
-                    gc.collect()
                     
                     progress_bar.progress((i + 1) / total_files)
                 

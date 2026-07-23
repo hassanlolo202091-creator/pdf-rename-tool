@@ -7,40 +7,41 @@ import zipfile
 import tempfile
 import easyocr
 
+# إعداد واجهة الصفحة
+st.set_page_config(page_title="PDF Rename Tool", page_icon="📄", layout="centered")
+PASSWORD = "123"  # تقدر تغير "123" لأي كلمة مرور حاببها
 
-# تعريف الباسورد المطلوب
-PASSWORD = "123"  # تقدر تغييره لأي باسوورد تحبه
-
-# دالة التحقق من كلمة المرور
 def check_password():
     def password_entered():
         if st.session_state["password"] == PASSWORD:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # حذف الباسورد من الذاكرة لأمان أكثر
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # عرض خانة إدخال الباسورد لأول مرة
+        st.title("🔒 تسجيل الدخول مطلوب")
         st.text_input("الرجاء إدخال كلمة المرور لدخول التطبيق:", type="password", on_change=password_entered, key="password")
         return False
     elif not st.session_state["password_correct"]:
-        # لو الباسورد خطأ
+        st.title("🔒 تسجيل الدخول مطلوب")
         st.text_input("الرجاء إدخال كلمة المرور لدخول التطبيق:", type="password", on_change=password_entered, key="password")
         st.error("😕 كلمة المرور غير صحيحة، حاول مرة أخرى.")
         return False
     else:
-        # لو الباسورد صحيح، افتح التطبيق
         return True
 
-# شرط تشغيل باقي التطبيق
+# تفعيل التحقق قبل فتح التطبيق
 if check_password():
-    # --- [حط هنا كل كود التطبيق بتاعك القديم زي ما هو] ---
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    # وباقي الكود...
-# إعداد واجهة الصفحة
-st.set_page_config(page_title="PDF Rename Tool", page_icon="📄", layout="centered")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها، استخراج أرقام التقارير، وإعادة تسميتها بالشكل المعياري الصحيح.")
 
+    @st.cache_resource
+    def load_reader():
+        return easyocr.Reader(['en'])
+
+    with st.spinner("جاري تهيئة قارئ النصوص (OCR)... برجاء الانتظار"):
+        reader = load_reader()
 st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
 st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها، استخراج أرقام التقارير، وإعادة تسميتها بالشكل المعياري الصحيح.")
 

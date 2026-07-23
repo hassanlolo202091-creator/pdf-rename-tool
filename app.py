@@ -36,7 +36,7 @@ def check_password():
 # تفعيل التحقق قبل فتح التطبيق
 if check_password():
     # الترحيب المخصص باسمك
-    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم المهندس/ حسن إبراهيم</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم / حسن إبراهيم</h3>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")

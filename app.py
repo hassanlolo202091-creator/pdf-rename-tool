@@ -11,7 +11,7 @@ import easyocr
 st.set_page_config(page_title="PDF Rename Tool", page_icon="📄", layout="centered")
 
 # --- نظام حماية الباسورد ---
-PASSWORD = "123"  # تقدر تغير "123" لأي كلمة مرور حاببها
+PASSWORD = "123"  # تقدر تغيره لو حابب
 
 def check_password():
     def password_entered():
@@ -40,7 +40,7 @@ if check_password():
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها، استخراج أرقام التقارير، وإعادة تسميتها بالشكل المعياري الصحيح.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها، البحث عن رقم التقرير مباشرة، وإعادة تسميته بالاسم الصحيح.")
 
     @st.cache_resource
     def load_reader():
@@ -74,6 +74,7 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
+                        # منطقة القص العلوية
                         rect = fitz.Rect(width * 0.35, height * 0.05, width * 0.98, height * 0.25)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
@@ -81,23 +82,22 @@ if check_password():
                         text = reader.readtext(img_array, detail=0, paragraph=True)
                         full_text = " ".join(text).upper()
                         
-                        match = re.search(r'P[-_A-Z0-9\s\|\+]+?RT[-_\|\s]*(\d+)', full_text)
+                        clean_name = ""
                         
-                        if match:
-                            raw_match = match.group(0)
-                            report_num = match.group(1)
-                            
-                            if len(report_num) == 5 and report_num.startswith('0'):
-                                report_num = report_num[1:]
-                                
-                            if 'RDS' in raw_match or 'RDS' in full_text:
-                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{report_num}.pdf"
-                            elif 'WQT' in raw_match or 'WQT' in full_text:
-                                clean_name = f"P30350-KTI-WQT-PIP-RT-{report_num}.pdf"
-                            else:
-                                clean_name = f"P-30350-UNKNOWN-RT-{report_num}.pdf"
+                        # 🟢 البحث العمومي عن REPORT NO أو الكود الكامل بغض النظر عن الصيغة
+                        report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
+                        
+                        if report_match:
+                            extracted_code = report_match.group(1).strip()
+                            clean_name = f"{extracted_code}.pdf"
                         else:
-                            clean_name = f"unnamed_{filename}"
+                            # 🟢 خطة بديلة لو كلمة Report No مش واضحة، يبحث عن أي كود يبدأ بـ P ويحتوي على RT
+                            fallback_match = re.search(r'(P[-_A-Z0-9\s\|\+]+?RT[-_\|\s]*\d+)', full_text)
+                            if fallback_match:
+                                extracted_code = re.sub(r'[\s\|\+]+', '', fallback_match.group(1))
+                                clean_name = f"{extracted_code}.pdf"
+                            else:
+                                clean_name = f"unnamed_{filename}"
                         
                         doc.close()
                         

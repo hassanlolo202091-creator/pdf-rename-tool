@@ -40,7 +40,7 @@ if check_password():
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الموجودة بعد كلمة (Report No) مباشرة بكل مرونة.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الواقعة بعد كلمة (Report No) بكل مرونة ودقة.")
 
     @st.cache_resource
     def load_reader():
@@ -74,8 +74,8 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # منطقة القص العلوية للبحث عن رقم التقرير
-                        rect = fitz.Rect(width * 0.30, height * 0.05, width * 0.98, height * 0.30)
+                        # منطقة القص العلوية للبحث عن رقم التقرير بدقة
+                        rect = fitz.Rect(width * 0.25, height * 0.03, width * 0.99, height * 0.35)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
@@ -84,14 +84,20 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # بحث عام وشامل عن أي نص يأتي بعد كلمة REPORT NO أياً كانت الصيغة
-                        report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
+                        # 🟢 تعبير نمطي عام ومرن جداً لالتقاط أي صيغة تأتي بعد كلمة REPORT NO أو ما يشابهها
+                        # يتعامل مع المسافات، الشرطات، النقاط، أو الرموز الفاصلة بطريقة ذكية
+                        report_match = re.search(r'REP(?:ORT)?[\s\.\-_]*NO[:\s\.\-_]*([A-Z0-9\-_/\.\s]{3,35})', full_text)
                         
                         if report_match:
-                            extracted_code = report_match.group(1).strip()
-                            clean_name = f"{extracted_code}.pdf"
+                            raw_code = report_match.group(1).strip()
+                            # تنظيف النص المستخرج ليكون صالحاً كاسم ملف نظام (إزالة المسافات الزائدة والرموز الممنوعة)
+                            extracted_code = re.sub(r'[\s/\\:\*\?"<>\|]+', '-', raw_code).strip('-')
+                            if extracted_code:
+                                clean_name = f"{extracted_code}.pdf"
+                            else:
+                                clean_name = filename
                         else:
-                            # لو لم يجد الكلمة، يحافظ على اسم الملف الأصلي تماماً من غير أي تغيير عشوائي
+                            # لو لم يتم العثور على النمط، يحافظ على اسم الملف الأصلي تماماً دون إفساده
                             clean_name = filename
                         
                         doc.close()

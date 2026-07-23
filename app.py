@@ -11,7 +11,7 @@ import easyocr
 st.set_page_config(page_title="PDF Rename Tool", page_icon="📄", layout="centered")
 
 # --- نظام حماية الباسورد ---
-PASSWORD = "123"  # تقدر تغيره لو حابب
+PASSWORD = "123"
 
 def check_password():
     def password_entered():
@@ -33,14 +33,12 @@ def check_password():
     else:
         return True
 
-# تفعيل التحقق قبل فتح التطبيق
 if check_password():
-    # الترحيب المخصص باسمك
     st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم المهندس/ حسن إبراهيم</h3>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها بدقة واستخراج أرقام التقارير وإعادة تسميتها بالشكل الصحيح.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بمعالجتها واستخراج أُم الكود الصحيح بدقة متناهية.")
 
     @st.cache_resource
     def load_reader():
@@ -74,8 +72,8 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # منطقة القص العلوية للبحث عن رقم التقرير
-                        rect = fitz.Rect(width * 0.30, height * 0.05, width * 0.98, height * 0.30)
+                        # توسيع نطاق القراءة قليلاً لضمان عدم قطع أطراف الكود
+                        rect = fitz.Rect(width * 0.30, height * 0.03, width * 0.99, height * 0.32)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
@@ -84,20 +82,30 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # 1. البحث الدقيق خلف كلمة REPORT NO
-                        report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
+                        # 🟢 الحل الجذري: البحث عن أي تسلسل يحتوي على P30350 أو يشبهه بداخل النص بغض النظر عن أخطاء الـ OCR
+                        # والبحث عن رقم التقرير النهائي (مثل RT-0036 أو ما يشابهه) لضمان دمج الاسم كاملاً
+                        match_full = re.search(r'(P[-_\s]*303[50SO]+\b.*?RT[-_\s]*\d+)', full_text)
                         
-                        if report_match:
-                            extracted_code = report_match.group(1).strip()
-                            clean_name = f"{extracted_code}.pdf"
-                        else:
-                            # 2. بحث بدقيق عن أي نموذج يبدأ بـ P ويحتوي على RT ورقم
-                            fallback_match = re.search(r'(P[-_A-Z0-9\s\|\+]+?RT[-_\|\s]*\d+)', full_text)
-                            if fallback_match:
-                                extracted_code = re.sub(r'[\s\|\+]+', '', fallback_match.group(1))
-                                clean_name = f"{extracted_code}.pdf"
+                        if match_full:
+                            raw_code = match_full.group(1)
+                            # تنظيف وتصحيح الأخطاء الشائعة للـ OCR تلقائياً
+                            fixed_code = raw_code.replace(" ", "").replace("_", "-")
+                            fixed_code = fixed_code.replace("O", "0").replace("J", "3").replace("S", "5")
+                            # ضمان الصيغة القياسية الصحيحة للمشروع
+                            if "WQT" in full_text:
+                                clean_name = f"P30350-KTI-WQT-PIP-RT-{re.search(r'RT[-_\s]*(\d+)', fixed_code).group(1)}.pdf"
+                            elif "RDS" in full_text:
+                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{re.search(r'RT[-_\s]*(\d+)', fixed_code).group(1)}.pdf"
                             else:
-                                # في حال لم يجد أي نمط، يحافظ على اسم الملف الأصلي تماماً ولا يغيره عشوائياً
+                                clean_name = f"{fixed_code}.pdf"
+                        else:
+                            # لو لم يتم مطابقة النمط الكامل، ابحث عن كلمة Report No ورقمها مباشرة
+                            report_no_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
+                            if report_no_match:
+                                r_no = report_no_match.group(1).replace("O", "0").replace("J", "3")
+                                clean_name = f"{r_no}.pdf"
+                            else:
+                                # لو فشل تماماً، اترك اسم الملف الأصلي كما هو لضمان عدم إتلافه
                                 clean_name = filename
                         
                         doc.close()

@@ -33,12 +33,14 @@ def check_password():
     else:
         return True
 
+# تفعيل التحقق قبل فتح التطبيق
 if check_password():
+    # الترحيب المخصص باسمك
     st.markdown("<h3 style='text-align: center; color: #4B9CD3;'>👨‍💻 تصميم المهندس/ حسن إبراهيم</h3>", unsafe_allow_html=True)
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بتصحيح الأكواد واستخراج الأسماء المعيارية بدقة كاملة.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها بدقة واستخراج أرقام التقارير وإعادة تسميتها بالشكل الصحيح.")
 
     @st.cache_resource
     def load_reader():
@@ -72,8 +74,8 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # نطاق قراءة دقيق للجزء العلوي من التقرير
-                        rect = fitz.Rect(width * 0.25, height * 0.03, width * 0.99, height * 0.35)
+                        # منطقة القص العلوية للبحث عن رقم التقرير
+                        rect = fitz.Rect(width * 0.30, height * 0.05, width * 0.98, height * 0.30)
                         pix = page.get_pixmap(clip=rect, dpi=300)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
@@ -82,28 +84,15 @@ if check_password():
                         
                         clean_name = ""
                         
-                        # 1. البحث عن رقم الـ RT الفعلي أياً كان شكله (مثل RT-02261 أو RT-2263 أو ما شابه)
+                        # استخراج رقم الـ RT بدقة من النص المرصود
                         rt_match = re.search(r'RT[-_\s]*(\d+)', full_text)
-                        
-                        if rt_match:
-                            rt_number = rt_match.group(1).zfill(5)  # توحيد عدد الأصفار لضمان التنسيق (مثل 02263 أو 02261)
-                            
-                            # تحديد نوع التقرير وتطبيق القاعدة الهندسية الصحيحة 100%
-                            if "WQT" in full_text:
-                                clean_name = f"P30350-KTI-WQT-PIP-RT-{rt_number}.pdf"
-                            elif "RDS" in full_text or "P-30" in full_text or "30350" in full_text or "30360" in full_text:
-                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{rt_number}.pdf"
+                        مباشرة
+                            report_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
+                            if report_match:
+                                extracted_code = report_match.group(1).strip().replace("O", "0").replace("J", "3")
+                                clean_name = f"{extracted_code}.pdf"
                             else:
-                                clean_name = f"P-30350-RDS-4-KTI-PIP-RT-{rt_number}.pdf"
-                        else:
-                            # 2. في حال عدم وجود كلمة RT، نبحث عن أي كود تقرير صريح ونظفه
-                            report_no_match = re.search(r'REPORT\s*NO[:\s]*([A-Z0-9\-_]+)', full_text)
-                            if report_no_match:
-                                r_no = report_no_match.group(1).replace("O", "0").replace("J", "3")
-                                clean_name = f"{r_no}.pdf"
-                            else:
-                                # الحفاظ على الاسم الأصلي تماماً لو استعصى القارئ
-                                clean_name = filename
+                                clean_name = filename  # الحفاظ على الاسم الأصلي تماماً لو لم يجد شيئاً
                         
                         doc.close()
                         

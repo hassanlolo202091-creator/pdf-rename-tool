@@ -40,18 +40,14 @@ if check_password():
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
     st.title("📄 نظام إعادة تسمية تقارير الـ PDF تلقائياً")
-    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الواقعة بعد كلمة (Report No) وتصحيحها ذكياً.")
+    st.write("قم برفع ملفات الـ PDF وسيقوم النظام بقراءتها واستخراج صيغة التسمية الواقعة بعد كلمة (Report No) وتصحيح أخطاء الـ OCR تلقائياً.")
 
     @st.cache_resource
     def load_reader():
         return easyocr.Reader(['en'])
 
-    try:
-        with st.spinner("جاري تهيئة قارئ النصوص (OCR)... برجاء الانتظار"):
-            reader = load_reader()
-    except Exception as e:
-        st.error(f"حدث خطأ أثناء تحميل قارئ النصوص: {e}")
-        st.stop()
+    with st.spinner("جاري تهيئة قارئ النصوص (OCR)... برجاء الانتظار"):
+        reader = load_reader()
 
     uploaded_files = st.file_uploader("اختر ملفات الـ PDF أو اسحبها هنا", type=["pdf"], accept_multiple_files=True)
 
@@ -78,14 +74,16 @@ if check_password():
                         page = doc[0]
                         width, height = page.rect.width, page.rect.height
                         
-                        # منطقة القص العلوية
+                        # منطقة القص العلوية للبحث عن رقم التقرير بدقة
                         rect = fitz.Rect(width * 0.25, height * 0.03, width * 0.99, height * 0.35)
                         
-                        # تم إرجاع الإعدادات المستقرة لمنع استهلاك الرامات وحدوث كراش
-                        pix = page.get_pixmap(clip=rect, dpi=300)
+                        # زيادة دقة الصورة لـ 400 وتحويلها لرمادي لتحسين دقة القراءة جداً
+                        pix = page.get_pixmap(clip=rect, dpi=400, colorspace=fitz.csGRAY)
                         img_array = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
                         
-                        text = reader.readtext(img_array, detail=0, paragraph=True)
+                        # إجبار القارئ على التعرف على هذه الرموز فقط لتجنب الشوائب
+                        allowlist = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./ '
+                        text = reader.readtext(img_array, detail=0, paragraph=True, allowlist=allowlist)
                         full_text = " ".join(text).upper()
                         
                         clean_name = ""
@@ -96,14 +94,15 @@ if check_password():
                         if report_match:
                             raw_code = report_match.group(1).strip()
                             
-                            # --- فلتر التصحيح الذكي (آمن تماماً ولا يسبب كراش) ---
+                            # --- فلتر التصحيح الذكي (Smart Correction Filter) ---
+                            # بيعالج اللخبطة البصرية المعتادة في الـ OCR من غير ما يجبره على اسم مشروع ثابت
                             corrected_code = raw_code.replace('P.', 'P-')
                             corrected_code = corrected_code.replace('O', '0')
                             corrected_code = corrected_code.replace('J', '3')
                             corrected_code = corrected_code.replace('-A-', '-4-')
                             corrected_code = corrected_code.replace('WAT', 'WQT')
                             
-                            # تنظيف المسافات والرموز الممنوعة في أسماء الملفات
+                            # تنظيف المسافات والرموز غير المسموحة في أسماء الويندوز
                             extracted_code = re.sub(r'[\s/\\:\*\?"<>\|]+', '-', corrected_code).strip('-')
                             
                             if extracted_code:
